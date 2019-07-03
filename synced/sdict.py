@@ -49,6 +49,9 @@ class sdict(dict):
     def setdefault(self, key, default=None):
         self.__setitem__(key, default)
 
+    def __len__(self):
+        return self._memory_store.__len__()
+
     def __setitem__(self, key, value):
         self._disk_store.put(key, value, self._name, 'dict')
         self._memory_store[key] = value

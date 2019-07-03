@@ -39,6 +39,9 @@ class slist(list):
         for item in iterable:
             self.append(item)
 
+    def __len__(self):
+        return self._memory_store.__len__()
+
     def __iter__(self):
         return self._memory_store.__iter__()
 
@@ -57,11 +60,11 @@ class slist(list):
         self._disk_store.delete_all(self._name, 'list')
         self._memory_store = list()
 
-    def count(self):
-        return self._disk_store.get_length(self._name, 'list')
+    def count(self, value):
+        return self._memory_store.count(value)
 
     def index(self, index, start=None, end=None):
-        raise NotImplementedError
+        return self._memory_store.index(index, start, end)
 
     def pop(self, index=None):
         raise NotImplementedError

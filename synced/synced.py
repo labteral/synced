@@ -3,6 +3,7 @@
 
 import rocksdb
 from . import utils
+from rocksdb import DB, Options, WriteBatch
 
 
 class Singleton(type):
@@ -16,14 +17,19 @@ class Singleton(type):
 
 class DiskStore(metaclass=Singleton):
     def __init__(self, chain_dir):
-        self._db = rocksdb.DB(f'{chain_dir}', rocksdb.Options(create_if_missing=True))
+        self._db = DB(f'{chain_dir}', Options(create_if_missing=True))
 
-    def put(self, key, value, name, coll_type):
+    def put(self, key, value, name, coll_type, write_batch=None):
         if type(key) is not str:
             raise TypeError
         key_bytes = utils.get_key_bytes(key, name, coll_type)
         value_bytes = utils.to_bytes(value)
-        self._db.put(key_bytes, value_bytes, sync=True)
+
+        if write_batch is not None:
+            write_batch.put(key_bytes, value_bytes)
+        else:
+            self._db.put(key_bytes, value_bytes, sync=True)
+
         return
 
     def get(self, key, name, coll_type):
@@ -38,10 +44,10 @@ class DiskStore(metaclass=Singleton):
         self._db.delete(key_bytes, sync=True)
 
     def delete_all(self, name, coll_type):
-        for key, _ in self.get_all(name, coll_type):
+        for key, _ in self._get_all(name, coll_type):
             self.delete(key, name, coll_type)
 
-    def get_all(self, name, coll_type):
+    def _get_all(self, name, coll_type):
         prefix = utils.str_to_bytes(f'{name}_{coll_type}_')
         iterator = self._db.iterkeys()
         iterator.seek(prefix)
@@ -52,16 +58,24 @@ class DiskStore(metaclass=Singleton):
             value = utils.to_object(value_bytes)
             yield key, value
 
+    def get_all(self, name, coll_type):
+        for key, value in self._get_all(name, coll_type):
+            if coll_type == 'list':
+                if key != 'length':
+                    yield value
+            elif coll_type == 'dict':
+                yield key, value
+
     def append(self, value, name, coll_type):
         if coll_type != 'list':
             raise ValueError
 
         length = self.get_length(name, coll_type)
 
-        ## WRITE BATCH
-        self.put('length', length, name, coll_type)
-        self.put(f'{length - 1}', value, name, coll_type)
-        ## WRITE BATCH
+        write_batch = WriteBatch()
+        self.put('length', length, name, coll_type, write_batch=write_batch)
+        self.put(f'{length - 1}', value, name, coll_type, write_batch=write_batch)
+        self._db.write(write_batch, sync=True)
 
     def get_length(self, name, coll_type):
         if coll_type != 'list':
