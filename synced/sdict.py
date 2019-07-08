@@ -8,12 +8,15 @@ from collections.abc import Mapping, Iterable
 
 
 class sdict(dict):
+
+    COLL_TYPE = 'dict'
+
     def __init__(self, name, collection=None, path=None, **kwargs):
         self._memory_store = dict()
         self._disk_store = DiskStore(path)
         self._name = name
 
-        for key, value in self._disk_store.get_all(self._name, 'dict'):
+        for key, value in self._disk_store.get_all(self._name, sdict.COLL_TYPE):
             self._memory_store[key] = value
 
         if collection is not None:
@@ -25,7 +28,8 @@ class sdict(dict):
     def __str__(self):
         return self._memory_store.__str__()
 
-    __repr__ = __str__
+    def __repr__(self):
+        return self._memory_store.__repr__()
 
     def update(self, collection):
         if isinstance(collection, Mapping):
@@ -39,14 +43,14 @@ class sdict(dict):
         raise TypeError
 
     def clear(self):
-        self._disk_store.delete_all(self._name, 'dict')
+        self._disk_store.delete_all(self._name, sdict.COLL_TYPE)
         self._memory_store = dict()
 
     def get_dict(self):
         return dict(self._memory_store)
 
     def pop(self, key, default=None):
-        self._disk_store.delete(key, self._name, 'dict')
+        self._disk_store.delete(key, self._name, sdict.COLL_TYPE)
         return self._memory_store.pop(key)
 
     def setdefault(self, key, default=None):
@@ -56,14 +60,14 @@ class sdict(dict):
         return self._memory_store.__len__()
 
     def __setitem__(self, key, value):
-        self._disk_store.put(key, value, self._name)
+        self._disk_store.put_dict(key, value, self._name)
         self._memory_store[key] = value
 
     def __getitem__(self, key):
         return self._memory_store[key]
 
     def __delitem__(self, key):
-        self._disk_store.delete(key, self._name, 'dict')
+        self._disk_store.delete(key, self._name, sdict.COLL_TYPE)
         del self._memory_store[key]
 
     def copy(self):

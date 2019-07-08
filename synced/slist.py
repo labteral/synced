@@ -8,12 +8,15 @@ from collections.abc import Iterable
 
 
 class slist(list):
+
+    COLL_TYPE = 'list'
+
     def __init__(self, name, collection=None, path=None, **kwargs):
         self._memory_store = list()
         self._disk_store = DiskStore(path)
         self._name = name
 
-        for value in self._disk_store.get_all(self._name, 'list'):
+        for value in self._disk_store.get_all(self._name, slist.COLL_TYPE):
             self._memory_store.append(value)
 
         if collection is not None:
@@ -25,7 +28,8 @@ class slist(list):
     def __str__(self):
         return self._memory_store.__str__()
 
-    __repr__ = __str__
+    def __repr__(self):
+        return self._memory_store.__repr__()
 
     def update(self, collection):
         if not isinstance(collection, str) and isinstance(collection, Iterable):
@@ -35,7 +39,7 @@ class slist(list):
         raise TypeError
 
     def append(self, value):
-        self._disk_store.append(value, self._name)
+        self._disk_store.append_list(value, self._name)
         self._memory_store.append(value)
 
     def extend(self, iterable):
@@ -52,15 +56,15 @@ class slist(list):
         return self._memory_store.__getitem__(index)
 
     def __delitem__(self, index):
-        self._disk_store.delete(str(index), self._name, 'list')
+        self._disk_store.delete(str(index), self._name, slist.COLL_TYPE)
         del self._memory_store[index]
 
     def __setitem__(self, index, item):
-        self._disk_store.put(str(index), item, self._name, 'list')
+        self._disk_store.put(str(index), item, self._name, slist.COLL_TYPE)
         self._memory_store[index] = item
 
     def clear(self):
-        self._disk_store.delete_all(self._name, 'list')
+        self._disk_store.delete_all(self._name, slist.COLL_TYPE)
         self._memory_store = list()
 
     def count(self, value):

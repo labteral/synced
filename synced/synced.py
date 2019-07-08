@@ -15,6 +15,9 @@ class Singleton(type):
         return cls._instances[cls]
 
 
+COLL_TYPES = set(['list', 'dict'])
+
+
 class DiskStore(metaclass=Singleton):
     def __init__(self, path=None):
         if path is None:
@@ -22,36 +25,59 @@ class DiskStore(metaclass=Singleton):
         opts = {'create_if_missing': True}
         self._db = DB(f'{path}', opts)
 
+    # COMMON ##########################################################################################################
+
     @staticmethod
-    def _get_real_key(name, coll_type, key):
-        return f'{name}_{coll_type}_{key}'
+    def _get_real_key(name, coll_type, key=None):
+        real_key = f'{name}_{coll_type}'
+        if key is not None:
+            real_key = f'{real_key}_{key}'
+        return real_key
 
     @staticmethod
     def _get_prefix(name, coll_type):
         return f'{name}_{coll_type}_'
 
-    def put(self, key, value, name, write_batch=None):
-        coll_type = 'dict'
-        real_key = DiskStore._get_real_key(name, coll_type, key)
-        self._db.put(real_key, value, write_batch=write_batch)
-
     def commit(self, write_batch):
         self._db.commit(write_batch)
-
-    def get(self, key, name, coll_type):
-        real_key = DiskStore._get_real_key(name, coll_type, key)
-        return self._db.get(real_key)
 
     def delete(self, key, name, coll_type):
         real_key = DiskStore._get_real_key(name, coll_type, key)
         self._db.delete(real_key, sync=True)
 
-    def delete_all(self, name, coll_type):
+    # VALUE ###########################################################################################################
+
+    def set_value(self, value, name):
+        coll_type = 'value'
+        real_key = DiskStore._get_real_key(name, coll_type)
+        self._db.put(real_key, value)
+
+    def get_value(self, name):
+        coll_type = 'value'
+        real_key = DiskStore._get_real_key(name, coll_type)
+        return self._db.get(real_key)
+
+    # DICT ############################################################################################################
+
+    def put_dict(self, key, value, name, write_batch=None):
+        coll_type = 'dict'
+        real_key = DiskStore._get_real_key(name, coll_type, key)
+        self._db.put(real_key, value, write_batch=write_batch)
+
+    # COLLECTIONS #####################################################################################################
+
+    def delete_coll(self, name, coll_type):
+        if coll_type not in COLL_TYPES:
+            raise TypeError
+
         prefix = DiskStore._get_prefix(name, coll_type)
         for key, _ in self._db.scan(prefix):
             self.delete(key, name, coll_type)
 
-    def get_all(self, name, coll_type):
+    def get_coll(self, name, coll_type):
+        if coll_type not in COLL_TYPES:
+            raise TypeError
+
         prefix = DiskStore._get_prefix(name, coll_type)
         for key, value in self._db.scan(prefix):
             if coll_type == 'list':
@@ -60,12 +86,14 @@ class DiskStore(metaclass=Singleton):
             elif coll_type == 'dict':
                 yield key, value
 
-    def append(self, value, name):
+    # LIST ############################################################################################################
+
+    def append_list(self, value, name):
         coll_type = 'list'
 
         write_batch = WriteBatch()
 
-        length = self.get_length(name)
+        length = self._get_list_length(name)
         real_key = DiskStore._get_real_key(name, coll_type, 'length')
         self._db.put(real_key, length, write_batch=write_batch)
 
@@ -75,7 +103,7 @@ class DiskStore(metaclass=Singleton):
 
         self._db.commit(write_batch)
 
-    def get_length(self, name):
+    def _get_list_length(self, name):
         coll_type = 'list'
 
         real_key = DiskStore._get_real_key(name, coll_type, 'length')
