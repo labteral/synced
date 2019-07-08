@@ -8,16 +8,19 @@ from collections.abc import Iterable
 
 
 class slist(list):
-    def __init__(self, name, collection=None, chain_dir='./synced-data', **kwargs):
+    def __init__(self, name, collection=None, path=None, **kwargs):
         self._memory_store = list()
-        self._disk_store = DiskStore(chain_dir)
+        self._disk_store = DiskStore(path)
         self._name = name
 
         for value in self._disk_store.get_all(self._name, 'list'):
             self._memory_store.append(value)
 
         if collection is not None:
-            self.update(collection)
+            if not self._memory_store:
+                self.update(collection)
+            else:
+                logging.warn('already initialized, collection discarded')
 
     def __str__(self):
         return self._memory_store.__str__()
@@ -25,14 +28,14 @@ class slist(list):
     __repr__ = __str__
 
     def update(self, collection):
-        if isinstance(collection, Iterable):
+        if not isinstance(collection, str) and isinstance(collection, Iterable):
             for item in collection:
                 self.append(item)
             return
         raise TypeError
 
     def append(self, value):
-        self._disk_store.append(value, self._name, 'list')
+        self._disk_store.append(value, self._name)
         self._memory_store.append(value)
 
     def extend(self, iterable):

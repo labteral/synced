@@ -8,16 +8,19 @@ from collections.abc import Mapping, Iterable
 
 
 class sdict(dict):
-    def __init__(self, name, collection=None, chain_dir='./synced-data', **kwargs):
+    def __init__(self, name, collection=None, path=None, **kwargs):
         self._memory_store = dict()
-        self._disk_store = DiskStore(chain_dir)
+        self._disk_store = DiskStore(path)
         self._name = name
 
         for key, value in self._disk_store.get_all(self._name, 'dict'):
             self._memory_store[key] = value
 
         if collection is not None:
-            self.update(collection)
+            if not self._memory_store:
+                self.update(collection)
+            else:
+                logging.warn('already initialized, collection discarded')
 
     def __str__(self):
         return self._memory_store.__str__()
@@ -53,7 +56,7 @@ class sdict(dict):
         return self._memory_store.__len__()
 
     def __setitem__(self, key, value):
-        self._disk_store.put(key, value, self._name, 'dict')
+        self._disk_store.put(key, value, self._name)
         self._memory_store[key] = value
 
     def __getitem__(self, key):

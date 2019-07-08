@@ -4,4 +4,4 @@
 from .sdict import sdict
 from .slist import slist
 
-__version__ = '0.0.1a'
+__version__ = '0.0.4a'

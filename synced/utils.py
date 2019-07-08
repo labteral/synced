@@ -9,10 +9,6 @@ def to_bytes(value):
     return pickle.dumps(value, protocol=4)
 
 
-def get_key_bytes(key, namespace, coll_type):
-    return str_to_bytes(f'{namespace}_{coll_type}_{key}')
-
-
 def to_object(bytes_value):
     return pickle.loads(bytes_value)
 
