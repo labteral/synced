@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from . import utils
 from .synced import DiskStore
 import logging
 from collections.abc import Mapping, Iterable

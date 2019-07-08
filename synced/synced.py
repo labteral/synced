@@ -2,8 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import rocksdb
-from . import utils
-from easyrocks import DB, Options, WriteBatch
+from easyrocks import DB, Options, WriteBatch, utils
 
 
 class Singleton(type):
