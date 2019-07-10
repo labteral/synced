@@ -28,9 +28,10 @@ class DiskStore(metaclass=Singleton):
 
     @staticmethod
     def _get_real_key(name, coll_type, key=None):
-        real_key = f'{name}_{coll_type}'
-        if key is not None:
-            real_key = f'{real_key}_{key}'
+        prefix = DiskStore._get_prefix(name, coll_type)
+        if key is None:
+            return prefix
+        real_key = f'{prefix}{key}'
         return real_key
 
     @staticmethod
@@ -79,11 +80,14 @@ class DiskStore(metaclass=Singleton):
 
         prefix = DiskStore._get_prefix(name, coll_type)
         for key, value in self._db.scan(prefix):
+            if key[:len(prefix)] != prefix:
+                return
             if coll_type == 'list':
                 if key != DiskStore._get_real_key(name, coll_type, 'length'):
                     yield value
             elif coll_type == 'dict':
-                yield key, value
+                original_key = key.split(DiskStore._get_prefix(name, coll_type))[1]
+                yield original_key, value
 
     # LIST ############################################################################################################
 
@@ -96,7 +100,7 @@ class DiskStore(metaclass=Singleton):
         real_key = DiskStore._get_real_key(name, coll_type, 'length')
         self._db.put(real_key, length, write_batch=write_batch)
 
-        key = utils.get_padded_int(length)
+        key = str(length)
         real_key = DiskStore._get_real_key(name, coll_type, key)
         self._db.put(real_key, value, write_batch=write_batch)
 

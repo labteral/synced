@@ -11,6 +11,8 @@ class svalue:
     COLL_TYPE = 'value'
 
     def __init__(self, name, path=None):
+        if len(name) > 10:
+            raise ValueError
         self._disk_store = DiskStore(path)
         self._name = name
         self._memory_store = self._disk_store.get_value(self._name)

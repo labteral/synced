@@ -11,11 +11,13 @@ class sdict(dict):
     COLL_TYPE = 'dict'
 
     def __init__(self, name, collection=None, path=None, **kwargs):
+        if len(name) > 10:
+            raise ValueError
         self._memory_store = dict()
         self._disk_store = DiskStore(path)
         self._name = name
 
-        for key, value in self._disk_store.get_all(self._name, sdict.COLL_TYPE):
+        for key, value in self._disk_store.get_coll(self._name, sdict.COLL_TYPE):
             self._memory_store[key] = value
 
         if collection is not None:

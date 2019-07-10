@@ -11,11 +11,13 @@ class slist(list):
     COLL_TYPE = 'list'
 
     def __init__(self, name, collection=None, path=None, **kwargs):
+        if len(name) > 10:
+            raise ValueError
         self._memory_store = list()
         self._disk_store = DiskStore(path)
         self._name = name
 
-        for value in self._disk_store.get_all(self._name, slist.COLL_TYPE):
+        for value in self._disk_store.get_coll(self._name, slist.COLL_TYPE):
             self._memory_store.append(value)
 
         if collection is not None:
