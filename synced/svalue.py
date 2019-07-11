@@ -11,11 +11,14 @@ class svalue:
     COLL_TYPE = 'value'
 
     def __init__(self, name, path=None):
-        if len(name) > 10:
+        if len(name) > DiskStore.MAX_KEY_LENGTH:
             raise ValueError
         self._disk_store = DiskStore(path)
         self._name = name
         self._memory_store = self._disk_store.get_value(self._name)
+
+    def __eq__(self, other):
+        return self._memory_store.__eq__(other)
 
     def __str__(self):
         return self._memory_store.__str__()

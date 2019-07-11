@@ -11,7 +11,7 @@ class sdict(dict):
     COLL_TYPE = 'dict'
 
     def __init__(self, name, collection=None, path=None, **kwargs):
-        if len(name) > 10:
+        if len(name) > DiskStore.MAX_KEY_LENGTH:
             raise ValueError
         self._memory_store = dict()
         self._disk_store = DiskStore(path)
@@ -25,6 +25,9 @@ class sdict(dict):
                 self.update(collection)
             else:
                 logging.warn('already initialized, collection discarded')
+
+    def __eq__(self, other):
+        return self._memory_store.__eq__(other)
 
     def __str__(self):
         return self._memory_store.__str__()
@@ -44,7 +47,7 @@ class sdict(dict):
         raise TypeError
 
     def clear(self):
-        self._disk_store.delete_all(self._name, sdict.COLL_TYPE)
+        self._disk_store.delete_coll(self._name, sdict.COLL_TYPE)
         self._memory_store = dict()
 
     def get_dict(self):

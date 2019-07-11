@@ -11,7 +11,7 @@ class slist(list):
     COLL_TYPE = 'list'
 
     def __init__(self, name, collection=None, path=None, **kwargs):
-        if len(name) > 10:
+        if len(name) > DiskStore.MAX_KEY_LENGTH:
             raise ValueError
         self._memory_store = list()
         self._disk_store = DiskStore(path)
@@ -25,6 +25,9 @@ class slist(list):
                 self.update(collection)
             else:
                 logging.warn('already initialized, collection discarded')
+
+    def __eq__(self, other):
+        return self._memory_store.__eq__(other)
 
     def __str__(self):
         return self._memory_store.__str__()
@@ -65,7 +68,7 @@ class slist(list):
         self._memory_store[index] = item
 
     def clear(self):
-        self._disk_store.delete_all(self._name, slist.COLL_TYPE)
+        self._disk_store.delete_coll(self._name, slist.COLL_TYPE)
         self._memory_store = list()
 
     def count(self, value):

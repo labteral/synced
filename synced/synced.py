@@ -18,6 +18,9 @@ COLL_TYPES = set(['list', 'dict'])
 
 
 class DiskStore(metaclass=Singleton):
+
+    MAX_KEY_LENGTH = 20
+
     def __init__(self, path=None):
         if path is None:
             path = './synced-data'
@@ -30,7 +33,7 @@ class DiskStore(metaclass=Singleton):
     def _get_real_key(name, coll_type, key=None):
         prefix = DiskStore._get_prefix(name, coll_type)
         if key is None:
-            return prefix
+            return prefix[:-1]
         real_key = f'{prefix}{key}'
         return real_key
 
@@ -43,7 +46,7 @@ class DiskStore(metaclass=Singleton):
 
     def delete(self, key, name, coll_type):
         real_key = DiskStore._get_real_key(name, coll_type, key)
-        self._db.delete(real_key, sync=True)
+        self._db.delete(real_key)
 
     # VALUE ###########################################################################################################
 
@@ -72,7 +75,9 @@ class DiskStore(metaclass=Singleton):
 
         prefix = DiskStore._get_prefix(name, coll_type)
         for key, _ in self._db.scan(prefix):
-            self.delete(key, name, coll_type)
+            if key[:len(prefix)] != prefix:
+                return
+            self._db.delete(key)
 
     def get_coll(self, name, coll_type):
         if coll_type not in COLL_TYPES:
@@ -100,7 +105,7 @@ class DiskStore(metaclass=Singleton):
         real_key = DiskStore._get_real_key(name, coll_type, 'length')
         self._db.put(real_key, length, write_batch=write_batch)
 
-        key = str(length)
+        key = utils.get_padded_int(length)
         real_key = DiskStore._get_real_key(name, coll_type, key)
         self._db.put(real_key, value, write_batch=write_batch)
 
