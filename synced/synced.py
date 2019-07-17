@@ -75,8 +75,6 @@ class DiskStore(metaclass=Singleton):
 
         prefix = DiskStore._get_prefix(name, coll_type)
         for key, _ in self._db.scan(prefix):
-            if key[:len(prefix)] != prefix:
-                return
             self._db.delete(key)
 
     def get_coll(self, name, coll_type):
@@ -85,8 +83,6 @@ class DiskStore(metaclass=Singleton):
 
         prefix = DiskStore._get_prefix(name, coll_type)
         for key, value in self._db.scan(prefix):
-            if key[:len(prefix)] != prefix:
-                return
             if coll_type == 'list':
                 if key != DiskStore._get_real_key(name, coll_type, 'length'):
                     yield value
