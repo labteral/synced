@@ -35,6 +35,9 @@ class sdict(dict):
     def __repr__(self):
         return self._memory_store.__repr__()
 
+    def get_dict(self):
+        return dict(self._memory_store)
+
     def update(self, collection):
         if isinstance(collection, Mapping):
             for key, value in collection.items():

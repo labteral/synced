@@ -5,4 +5,4 @@ from .sdict import sdict
 from .slist import slist
 from .svalue import svalue
 
-__version__ = '0.0.10a'
+__version__ = '0.0.11a'

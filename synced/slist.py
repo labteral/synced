@@ -50,6 +50,9 @@ class slist(list):
         for item in iterable:
             self.append(item)
 
+    def get_list(self):
+        return list(self._memory_store)
+
     def __len__(self):
         return self._memory_store.__len__()
 
