@@ -26,6 +26,9 @@ class svalue:
     def __repr__(self):
         return self._memory_store.__repr__()
 
+    def get(self):
+        return self._memory_store
+
     def set(self, value):
         self._disk_store.set_value(value, self._name)
         self._memory_store = value
