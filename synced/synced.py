@@ -19,7 +19,7 @@ COLL_TYPES = set(['list', 'dict'])
 
 class DiskStore(metaclass=Singleton):
 
-    MAX_KEY_LENGTH = 20
+    MAX_KEY_LENGTH = 100
 
     def __init__(self, path=None):
         if path is None:

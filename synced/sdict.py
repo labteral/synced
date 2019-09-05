@@ -53,9 +53,6 @@ class sdict(dict):
         self._disk_store.delete_coll(self._name, sdict.COLL_TYPE)
         self._memory_store = dict()
 
-    def get_dict(self):
-        return dict(self._memory_store)
-
     def pop(self, key, default=None):
         self._disk_store.delete(key, self._name, sdict.COLL_TYPE)
         return self._memory_store.pop(key)
