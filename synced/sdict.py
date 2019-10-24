@@ -81,4 +81,4 @@ class sdict(dict):
         raise NotImplementedError
 
     def items(self):
-        raise NotImplementedError
+        return self._memory_store.items()
