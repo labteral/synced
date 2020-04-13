@@ -93,17 +93,23 @@ class DiskStore(metaclass=Singleton):
     # LIST ############################################################################################################
 
     def append_list(self, value, name):
-        coll_type = 'list'
+        self.extend_list([value], name)
 
+    def extend_list(self, values, name):
+        coll_type = 'list'
         write_batch = WriteBatch()
 
-        length = self._get_list_length(name)
-        real_key = DiskStore._get_real_key(name, coll_type, 'length')
-        self._db.put(real_key, length, write_batch=write_batch)
+        current_length = self._get_list_length(name)
 
-        key = utils.get_padded_int(length)
-        real_key = DiskStore._get_real_key(name, coll_type, key)
-        self._db.put(real_key, value, write_batch=write_batch)
+        # Add elements to the write batch
+        for index, value in enumerate(values):
+            key = utils.get_padded_int(current_length + index)
+            real_key = DiskStore._get_real_key(name, coll_type, key)
+            self._db.put(real_key, value, write_batch=write_batch)
+
+        # Set new length
+        real_key = DiskStore._get_real_key(name, coll_type, 'length')
+        self._db.put(real_key, current_length + len(values), write_batch=write_batch)
 
         self._db.commit(write_batch)
 
@@ -115,6 +121,5 @@ class DiskStore(metaclass=Singleton):
 
         if length is None:
             length = 0
-        length += 1
 
         return length

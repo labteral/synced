@@ -15,6 +15,7 @@ lista = slist('lista', path=path)
 lista.append(1)
 lista.append(2)
 lista.append(3)
+lista.extend([4,5,6,7])
 print(lista)
 del lista
 lista = slist('lista', path=path)
