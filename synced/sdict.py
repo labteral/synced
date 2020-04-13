@@ -74,6 +74,9 @@ class sdict(dict):
         self._disk_store.delete(key, self._name, sdict.COLL_TYPE)
         del self._memory_store[key]
 
+    def __contains__(self, value):
+        return self._memory_store.__contains__(value)
+
     def copy(self):
         raise NotImplementedError
 
