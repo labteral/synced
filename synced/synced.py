@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from easyrocks import DB, Options, WriteBatch, utils
+from easyrocks import RocksDB, WriteBatch, utils
 
 
 class Singleton(type):
@@ -24,7 +24,7 @@ class DiskStore(metaclass=Singleton):
         if path is None:
             path = './synced-data'
         opts = {'create_if_missing': True}
-        self._db = DB(f'{path}', opts)
+        self._db = RocksDB(f'{path}', opts)
 
     # COMMON ##########################################################################################################
 
