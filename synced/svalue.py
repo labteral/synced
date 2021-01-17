@@ -2,8 +2,6 @@
 # -*- coding: utf-8 -*-
 
 from .synced import DiskStore
-import logging
-from collections.abc import Iterable
 
 
 class svalue:
