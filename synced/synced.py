@@ -14,15 +14,6 @@ UINT_BYTES = 5
 MAX_UINT = 2**(UINT_BYTES * 8) - 1
 
 
-class Options:
-    @classmethod
-    def options(cls):
-        return set([
-            getattr(cls, model_type) for model_type in filter(
-                lambda x: x[:2] != '__', cls.__dict__.keys())
-        ])
-
-
 class DiskStore:
     def __init__(self, path: str = None):
         if not os.path.exists(path):
