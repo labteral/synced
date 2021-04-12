@@ -1,124 +1,173 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from easyrocks import RocksDB, WriteBatch, utils
+from easyrocks import (
+    RocksDB,
+    WriteBatch,
+    CompressionType,
+    utils,
+)
+import os
+from typing import List, Generator
+
+UINT_BYTES = 5
+MAX_UINT = 2**(UINT_BYTES * 8) - 1
 
 
-class Singleton(type):
-    _instances = {}
+class DiskStore:
+    def __init__(self, path: str = None):
+        if not os.path.exists(path):
+            os.makedirs(path)
 
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
-        return cls._instances[cls]
+        opts = {
+            'create_if_missing': True,
+            'compression': CompressionType.lz4_compression,
+            'use_fsync': True,
+            'paranoid_checks': True,
+            'compaction_options_universal': {
+                'compression_size_percent': 100,
+            }
+        }
+        self._db = RocksDB(path=path, opts=opts)
+        self._write_batch = None
+
+    def reload(self):
+        self._db.reload()
+        self._write_batch = None
+
+    def begin(self):
+        if self._write_batch is None:
+            self._write_batch = WriteBatch()
+
+    def commit(self):
+        self._db.commit(self._write_batch)
+        self._write_batch = None
 
 
-COLL_TYPES = set(['list', 'dict'])
+class CollectionStore(DiskStore):
+    def __init__(self, path: str = None):
+        super().__init__(path)
+
+    def clear(self):
+        for key, _ in self._db.scan():
+            self._db.delete(key, write_batch=self._write_batch)
 
 
-class DiskStore(metaclass=Singleton):
+class ListStore(CollectionStore):
+    LENGTH_KEY = b'\x00'
 
-    MAX_KEY_LENGTH = 100
+    def __init__(self, name: str, path: str):
+        super().__init__(f'{path}/list/{name}')
+        self._write_batch_index = 0
 
-    def __init__(self, path=None):
-        if path is None:
-            path = './synced-data'
-        opts = {'create_if_missing': True}
-        self._db = RocksDB(f'{path}', opts)
+    @property
+    def length(self) -> int:
+        real_length = self._db.get(self.LENGTH_KEY)
+        real_length = real_length if real_length is not None else 0
+        return real_length + self._write_batch_index
 
-    # COMMON ##########################################################################################################
+    def commit(self):
+        super().commit()
+        self._write_batch_index = 0
+
+    def get(self) -> Generator:
+        for key, value in self._db.scan():
+            if key != self.LENGTH_KEY:
+                yield value
+
+    def clear(self):
+        super().clear()
+
+    def extend(self, iterable):
+        current_length = self.length
+        is_write_batch_new = self._write_batch is None
+
+        if is_write_batch_new:
+            self.begin()
+
+        self._increment_length()
+
+        for index, value in enumerate(iterable):
+            key_bytes = self._get_key(current_length + index)
+            self._db.put(key_bytes, value, write_batch=self._write_batch)
+
+        if is_write_batch_new:
+            self.commit()
+
+    def append(self, value):
+        current_length = self.length
+        is_write_batch_new = self._write_batch is None
+
+        if is_write_batch_new:
+            self.begin()
+
+        self._increment_length()
+        key_bytes = self._get_key(current_length)
+        self._db.put(key_bytes, value, write_batch=self._write_batch)
+
+        if is_write_batch_new:
+            self.commit()
+
+    def delete(self, index: int):
+        key_bytes = self._get_key(index)
+        self._db.delete(key_bytes, write_batch=self._write_batch)
+
+    def put(self, index, value):
+        key_bytes = self._get_key(index)
+        self._db.put(key_bytes, value, write_batch=self._write_batch)
 
     @staticmethod
-    def _get_real_key(name, coll_type, key=None):
-        prefix = DiskStore._get_prefix(name, coll_type)
-        if key is None:
-            return prefix[:-1]
-        real_key = f'{prefix}{key}'
-        return real_key
+    def _get_key(index: int) -> bytes:
+        if isinstance(index, int):
+            return utils.int_to_padded_bytes(index, UINT_BYTES)
+        raise TypeError
+
+    def _increment_length(self):
+        if self._write_batch:
+            self._write_batch_index += 1
+        new_length = self.length
+        if new_length > MAX_UINT:
+            raise ValueError(f'{new_length} > {MAX_UINT}')
+        self._db.put(self.LENGTH_KEY, new_length, write_batch=self._write_batch)
+
+
+class DictStore(CollectionStore):
+    def __init__(self, name: str, path: str):
+        super().__init__(f'{path}/dict/{name}')
+
+    def get(self) -> Generator:
+        for key, value in self._db.scan():
+            yield key.decode('utf-8'), value
+
+    def clear(self):
+        super().clear()
+
+    def delete(self, key: str):
+        key_bytes = self._get_key(key)
+        self._db.delete(key_bytes, write_batch=self._write_batch)
+
+    def put(self, key: str, value):
+        key_bytes = self._get_key(key)
+        self._db.put(key_bytes, value, write_batch=self._write_batch)
 
     @staticmethod
-    def _get_prefix(name, coll_type):
-        return f'{name}_{coll_type}_'
+    def _get_key(key) -> bytes:
+        if not isinstance(key, str):
+            raise TypeError(f'sdict keys must be strings')
+        return bytes(key, 'utf-8')
 
-    def commit(self, write_batch):
-        self._db.commit(write_batch)
 
-    def delete(self, key, name, coll_type):
-        real_key = DiskStore._get_real_key(name, coll_type, key)
-        self._db.delete(real_key)
+class ValueStore(DiskStore):
+    VALUE_KEY = b'\x00'
 
-    # VALUE ###########################################################################################################
+    def __init__(self, name: str, path: str):
+        super().__init__(f'{path}/value/{name}')
 
-    def set_value(self, value, name):
-        coll_type = 'value'
-        real_key = DiskStore._get_real_key(name, coll_type)
-        self._db.put(real_key, value)
+    def set(self, value):
+        self._db.put(self.VALUE_KEY, value)
 
-    def get_value(self, name):
-        coll_type = 'value'
-        real_key = DiskStore._get_real_key(name, coll_type)
-        return self._db.get(real_key)
+    def get(self):
+        return self._db.get(self.VALUE_KEY)
 
-    # DICT ############################################################################################################
-
-    def put_dict(self, key, value, name, write_batch=None):
-        coll_type = 'dict'
-        real_key = DiskStore._get_real_key(name, coll_type, key)
-        self._db.put(real_key, value, write_batch=write_batch)
-
-    # COLLECTIONS #####################################################################################################
-
-    def delete_coll(self, name, coll_type):
-        if coll_type not in COLL_TYPES:
-            raise TypeError
-
-        prefix = DiskStore._get_prefix(name, coll_type)
-        for key, _ in self._db.scan(prefix):
-            self._db.delete(key)
-
-    def get_coll(self, name, coll_type):
-        if coll_type not in COLL_TYPES:
-            raise TypeError
-
-        prefix = DiskStore._get_prefix(name, coll_type)
-        for key, value in self._db.scan(prefix):
-            if coll_type == 'list':
-                if key != DiskStore._get_real_key(name, coll_type, 'length'):
-                    yield value
-            elif coll_type == 'dict':
-                original_key = key.split(DiskStore._get_prefix(name, coll_type))[1]
-                yield original_key, value
-
-    # LIST ############################################################################################################
-
-    def append_list(self, value, name):
-        self.extend_list([value], name)
-
-    def extend_list(self, values, name):
-        coll_type = 'list'
-        write_batch = WriteBatch()
-
-        current_length = self._get_list_length(name)
-
-        # Add elements to the write batch
-        for index, value in enumerate(values):
-            key = utils.get_padded_int(current_length + index)
-            real_key = DiskStore._get_real_key(name, coll_type, key)
-            self._db.put(real_key, value, write_batch=write_batch)
-
-        # Set new length
-        real_key = DiskStore._get_real_key(name, coll_type, 'length')
-        self._db.put(real_key, current_length + len(values), write_batch=write_batch)
-
-        self._db.commit(write_batch)
-
-    def _get_list_length(self, name):
-        coll_type = 'list'
-
-        real_key = DiskStore._get_real_key(name, coll_type, 'length')
-        length = self._db.get(real_key)
-
-        if length is None:
-            length = 0
-
-        return length
+    def delete(self):
+        self._db.delete(self.VALUE_KEY)

@@ -1,24 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from .synced import DiskStore
+from .synced import ListStore
 import logging
 from collections.abc import Iterable
 
 
 class slist(list):
-
-    COLL_TYPE = 'list'
-
     def __init__(self, name, collection=None, path=None, **kwargs):
-        if len(name) > DiskStore.MAX_KEY_LENGTH:
-            raise ValueError
-        self._memory_store = list()
-        self._disk_store = DiskStore(path)
-        self._name = name
+        if path is None:
+            path = './synced-data'
 
-        for value in self._disk_store.get_coll(self._name, slist.COLL_TYPE):
-            self._memory_store.append(value)
+        self._disk_store = ListStore(name, path)
+        self._load_memory_store()
 
         if collection is not None:
             if not self._memory_store:
@@ -26,52 +20,44 @@ class slist(list):
             else:
                 logging.warn('already initialized, collection discarded')
 
-    def __eq__(self, other):
-        return self._memory_store.__eq__(other)
+    @property
+    def list(self):
+        return list(self._memory_store)
 
-    def __str__(self):
-        return self._memory_store.__str__()
+    def begin(self):
+        self._disk_store.begin()
 
-    def __repr__(self):
-        return self._memory_store.__repr__()
+    def commit(self):
+        self._disk_store.commit()
+
+    def reload(self):
+        self._disk_store.reload()
+        self._load_memory_store()
 
     def update(self, collection):
         if not isinstance(collection, str) and isinstance(collection, Iterable):
-            for item in collection:
-                self.append(item)
+            self.extend(collection)
             return
         raise TypeError
 
     def append(self, value):
-        self._disk_store.append_list(value, self._name)
-        self._memory_store.append(value)
+        try:
+            self._disk_store.append(value)
+            self._memory_store.append(value)
+        except Exception as error:
+            self.reload()
+            raise error
 
     def extend(self, iterable):
-        for item in iterable:
-            self.append(item)
-
-    def get_list(self):
-        return list(self._memory_store)
-
-    def __len__(self):
-        return self._memory_store.__len__()
-
-    def __iter__(self):
-        return self._memory_store.__iter__()
-
-    def __getitem__(self, index):
-        return self._memory_store.__getitem__(index)
-
-    def __delitem__(self, index):
-        self._disk_store.delete(str(index), self._name, slist.COLL_TYPE)
-        del self._memory_store[index]
-
-    def __setitem__(self, index, item):
-        self._disk_store.put(str(index), item, self._name, slist.COLL_TYPE)
-        self._memory_store[index] = item
+        try:
+            self._disk_store.extend(iterable)
+            self._memory_store.extend(iterable)
+        except Exception as error:
+            self.reload()
+            raise error
 
     def clear(self):
-        self._disk_store.delete_coll(self._name, slist.COLL_TYPE)
+        self._disk_store.clear()
         self._memory_store = list()
 
     def count(self, value):
@@ -91,3 +77,34 @@ class slist(list):
 
     def copy(self):
         raise NotImplementedError
+
+    def _load_memory_store(self):
+        self._memory_store = list()
+        for value in self._disk_store.get():
+            self._memory_store.append(value)
+
+    def __eq__(self, other):
+        return self._memory_store.__eq__(other)
+
+    def __str__(self):
+        return self._memory_store.__str__()
+
+    def __repr__(self):
+        return self._memory_store.__repr__()
+
+    def __len__(self):
+        return self._memory_store.__len__()
+
+    def __iter__(self):
+        return self._memory_store.__iter__()
+
+    def __getitem__(self, index):
+        return self._memory_store.__getitem__(index)
+
+    def __delitem__(self, index):
+        self._disk_store.delete(index)
+        del self._memory_store[index]
+
+    def __setitem__(self, index, item):
+        self._disk_store.put(index, item)
+        self._memory_store[index] = item
