@@ -5,7 +5,8 @@ from setuptools import find_packages
 from setuptools import setup
 import synced
 
-setup(name='synced',
+setup(
+      name='synced',
       version=synced.__version__,
       description='',
       url='https://github.com/brunneis/synced',
@@ -23,4 +24,6 @@ setup(name='synced',
           "Programming Language :: Python :: 3.6",
           "Programming Language :: Python :: Implementation :: PyPy",
           "Topic :: Software Development :: Libraries :: Python Modules",
-      ])
+      ],
+      install_requires=['easyrocks']
+)
